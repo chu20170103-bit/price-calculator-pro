@@ -22,7 +22,9 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm install
 
       # 專案站點網址為 https://<使用者>.github.io/<倉庫名>/
       # 在 Repo Settings → Secrets 新增 VITE_SUPABASE_URL、VITE_SUPABASE_ANON_KEY 後，GitHub Pages 版才能寫入/讀取 Supabase

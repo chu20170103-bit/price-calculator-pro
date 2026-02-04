@@ -48,8 +48,17 @@ async function main() {
 
   if (wait) {
     console.log('\n3. 等待執行完成（約 1～2 分鐘）...');
-    run('gh run watch --exit-status', { stdio: 'inherit' });
-    console.log('\n部署完成。網址：https://' + owner + '.github.io/' + repoName + '/');
+    await new Promise((r) => setTimeout(r, 4000));
+    const list = run(
+      `gh run list --workflow="deploy-gh-pages.yml" --limit 1 --json databaseId,status --jq '.[0].databaseId'`
+    ).trim();
+    const runId = list;
+    if (runId && runId !== 'null') {
+      run(`gh run watch ${runId} --exit-status`, { stdio: 'inherit' });
+      console.log('\n部署完成。網址：https://' + owner + '.github.io/' + repoName + '/');
+    } else {
+      console.log('\n請到 Actions 查看：https://github.com/' + repo + '/actions');
+    }
   } else {
     console.log('\n到 Actions 查看進度：https://github.com/' + repo + '/actions');
     console.log('完成後網址：https://' + owner + '.github.io/' + repoName + '/');
