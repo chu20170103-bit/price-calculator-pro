@@ -4,7 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-// 部署到 GitHub Pages 時需設 BASE_PATH=/倉庫名/，例如 BASE_PATH=/price-calculator-pro-main/
+// 部署到 GitHub Pages 時由 CI 設 BASE_PATH=/倉庫名/（此倉庫為 /price-calculator-pro/）
 export default defineConfig(({ mode }) => ({
   base: process.env.BASE_PATH || "/",
   server: {

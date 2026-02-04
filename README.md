@@ -62,15 +62,25 @@ This project is built with:
 
 ## GitHub Pages 部署（網頁要能開）
 
-1. **在 GitHub 開啟 Pages**  
-   倉庫 → **Settings** → 左側 **Pages** → **Build and deployment** 的 **Source** 選 **GitHub Actions**（不要選 Deploy from a branch）。
+**這個專案推送到 [chu20170103-bit/price-calculator-pro](https://github.com/chu20170103-bit/price-calculator-pro) 後，網址為：**  
+**https://chu20170103-bit.github.io/price-calculator-pro/**
 
-2. **推送程式碼**  
-   推送後會自動跑「Deploy to GitHub Pages」workflow；跑完後網址為：  
-   `https://<你的帳號>.github.io/<倉庫名>/`  
-   例如：`https://myuser.github.io/price-calculator-pro-main/`
+### 上傳步驟
 
-3. 若之前選過「Deploy from a branch」或沒選過 Source，請改選 **GitHub Actions** 再等 workflow 跑完。
+1. **推送程式碼到 GitHub**
+   ```bash
+   git add .
+   git commit -m "Deploy to GitHub Pages"
+   git push origin main
+   ```
+   若你的遠端分支叫 `master`，就改成 `git push origin master`。
+
+2. **在 GitHub 開啟 Pages（只需做一次）**  
+   打開 [Settings → Pages](https://github.com/chu20170103-bit/price-calculator-pro/settings/pages) → **Build and deployment** 的 **Source** 選 **GitHub Actions**（不要選 Deploy from a branch）。
+
+3. **等 Actions 跑完**  
+   到 [Actions](https://github.com/chu20170103-bit/price-calculator-pro/actions) 看「Deploy to GitHub Pages」變綠色後，開：  
+   **https://chu20170103-bit.github.io/price-calculator-pro/**
 
 ## 疑難排解：MIME type "application/octet-stream" 錯誤
 
