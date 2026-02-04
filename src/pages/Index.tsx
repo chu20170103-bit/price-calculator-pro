@@ -55,13 +55,23 @@ const Index = () => {
   const [livePresets, setLivePresets] = useState<PresetForFormula[]>([]);
   const [pendingImport, setPendingImport] = useState<NamedPresetProfile | null>(null);
 
-  useSupabaseSync({
+  const { saveNow } = useSupabaseSync({
     games,
     currentGameId,
     namedProfiles: profiles,
     loadGames: loadGamesFromCloud,
     loadProfiles: loadProfilesFromCloud,
   });
+
+  /** 刪除方案紀錄後立即寫入雲端 */
+  const handleDeleteProfile = useCallback(
+    (id: string) => {
+      console.log('[操作紀錄] 刪除方案紀錄，即將寫入雲端');
+      deleteProfile(id);
+      setTimeout(() => saveNow(), 100);
+    },
+    [deleteProfile, saveNow]
+  );
 
   const handlePresetSelect = useCallback(
     (preset: Preset) => {
@@ -167,8 +177,10 @@ const Index = () => {
                   })));
                 }}
                 onSaveNamed={(name, rows) => {
+                  console.log('[操作紀錄] 新增方案紀錄', name, '，即將寫入雲端');
                   addProfile(name, rows);
                   rows.forEach(row => addHistoryEntry(rowToHistoryEntry(name, row)));
+                  setTimeout(() => saveNow(), 100);
                 }}
                 onRowsChange={setLivePresets}
                 pendingImport={pendingImport?.rows ?? null}
@@ -205,7 +217,7 @@ const Index = () => {
 
           {/* Right column: Named presets + History */}
           <section className="card-elevated space-y-5">
-            <NamedPresetList profiles={profiles} onDelete={deleteProfile} onImport={handleImportNamedProfile} />
+            <NamedPresetList profiles={profiles} onDelete={handleDeleteProfile} onImport={handleImportNamedProfile} />
 
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-primary" />

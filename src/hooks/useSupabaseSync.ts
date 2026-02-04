@@ -7,7 +7,8 @@ import type { NamedPresetProfile } from './useNamedPresets';
 const SYNC_CODE_KEY = 'pricing-sync-code';
 /** 未設定同步碼時使用的預設 key，讓開頁就讀／寫雲端同一筆資料 */
 const DEFAULT_SYNC_KEY = 'main';
-const SAVE_DEBOUNCE_MS = 800;
+/** 立即寫入：縮短 debounce，變更後很快就推上雲端 */
+const SAVE_DEBOUNCE_MS = 300;
 
 /** 同步用的 key：有設定同步碼則用同步碼，否則用預設 main（預設即讀寫雲端） */
 function getSyncKey(): string {
@@ -67,11 +68,10 @@ export function useSupabaseSync({
 
   const saveToSupabase = useCallback(async () => {
     if (!isSupabaseConfigured()) {
-      if (import.meta.env.DEV) {
-        console.info('[Supabase] 未設定：請在 .env 設定 VITE_SUPABASE_URL、VITE_SUPABASE_ANON_KEY');
-      }
+      console.warn('[Supabase] 未設定，跳過寫入');
       return;
     }
+    console.log('[Supabase] 操作紀錄：開始寫入雲端', { profiles: namedProfiles.length, games: games.length });
     setIsSaving(true);
     const key = getSyncKey();
     const payload = {
@@ -100,10 +100,44 @@ export function useSupabaseSync({
     }
     setLastSyncedAt(new Date());
     setIsSaving(false);
-    if (import.meta.env.DEV) {
-      console.info('[Supabase] 已寫入');
-    }
+    console.log('[Supabase] 操作紀錄：已寫入雲端');
   }, [games, currentGameId, namedProfiles]);
+
+  /** 從雲端讀取並套用（初次載入 + 切回分頁時立即讀取，快取會由 loadGames/loadProfiles 寫入 localStorage） */
+  const refetchFromCloud = useCallback(() => {
+    if (!isSupabaseConfigured()) return;
+    console.log('[Supabase] 操作紀錄：從雲端讀取');
+    const key = getSyncKey();
+    supabase
+      .from('pricing_sync')
+      .select('games, current_game_id, named_profiles')
+      .eq('device_id', key)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('[Supabase] 讀取失敗:', error.message);
+          return;
+        }
+        if (!data) return;
+        const gamesFromCloud = data.games as Game[] | null;
+        let profilesFromCloud = data.named_profiles;
+        if (typeof profilesFromCloud === 'string') {
+          try {
+            profilesFromCloud = JSON.parse(profilesFromCloud);
+          } catch {
+            profilesFromCloud = null;
+          }
+        }
+        const normalizedProfiles = normalizeProfiles(profilesFromCloud);
+        const cid = (data.current_game_id as string) || '';
+        if (Array.isArray(gamesFromCloud) && gamesFromCloud.length > 0) {
+          loadGames(gamesFromCloud, cid || gamesFromCloud[0]?.id || '');
+        }
+        loadProfiles(normalizedProfiles);
+        console.log('[Supabase] 操作紀錄：讀取完成並已套用');
+      })
+      .catch((err) => console.error('[Supabase] 讀取例外:', err));
+  }, [loadGames, loadProfiles]);
 
   useEffect(() => {
     const configured = isSupabaseConfigured();
@@ -163,6 +197,22 @@ export function useSupabaseSync({
         setInitialLoadDone(true);
       });
   }, [loadGames, loadProfiles]);
+
+  /** 切回分頁時立即從雲端讀取，讓其他裝置的變更馬上顯示（快取會更新） */
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !initialLoadDone) return;
+    let t: ReturnType<typeof setTimeout>;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      console.log('[操作紀錄] 切回分頁，即將從雲端讀取');
+      t = setTimeout(() => refetchFromCloud(), 400);
+    };
+    window.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('visibilitychange', onVisible);
+      clearTimeout(t!);
+    };
+  }, [refetchFromCloud, initialLoadDone]);
 
   const setSyncCode = useCallback((code: string) => {
     const trimmed = code.trim();
@@ -237,6 +287,23 @@ export function useSupabaseSync({
     saveToSupabase();
   }, [saveToSupabase]);
 
+  /** 刪除雲端儲存：把此 device_id 在 pricing_sync 的那一筆整筆刪除（清空雲端資料） */
+  const deleteCloudStorage = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      toast.error('未設定 Supabase');
+      return;
+    }
+    const key = getSyncKey();
+    const { error } = await supabase.from('pricing_sync').delete().eq('device_id', key);
+    if (error) {
+      console.error('[Supabase] 刪除雲端儲存失敗:', error.message);
+      toast.error('刪除雲端儲存失敗：' + error.message);
+      return;
+    }
+    console.log('[Supabase] 操作紀錄：已刪除雲端儲存');
+    toast.success('已刪除雲端儲存，本機資料不受影響');
+  }, []);
+
   const syncKeyForDisplay = getSyncKey();
   const isUsingSyncCode = Boolean(syncCode);
 
@@ -246,6 +313,8 @@ export function useSupabaseSync({
     clearSyncCode,
     loadBySyncCode,
     saveNow,
+    refetchFromCloud,
+    deleteCloudStorage,
     lastSyncedAt,
     isSaving,
     /** 目前用來讀取／寫入雲端的 key（同步碼或預設 main） */
