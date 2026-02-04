@@ -33,6 +33,13 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      - name: Check Supabase（有設 Secrets 時自動驗證連線與讀寫）
+        if: secrets.VITE_SUPABASE_URL != ''
+        run: npm run supabase:check
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:

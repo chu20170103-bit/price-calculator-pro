@@ -208,6 +208,11 @@ const Index = () => {
 
           {/* Right column: Named presets + History + Sync */}
           <section className="card-elevated space-y-5">
+            {!isSupabaseConfigured() && (
+              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+                <strong>雲端同步未設定：</strong>本機請在專案根目錄建立 <code className="rounded bg-black/10 px-1">.env</code> 並設定 <code className="rounded bg-black/10 px-1">VITE_SUPABASE_URL</code>、<code className="rounded bg-black/10 px-1">VITE_SUPABASE_ANON_KEY</code>；若為 GitHub Pages，請到 Repo Settings → Secrets and variables → Actions 新增這兩個 secrets 後重新部署。詳見 <code className="rounded bg-black/10 px-1">supabase/CHECKLIST.md</code>。
+              </div>
+            )}
             {isSupabaseConfigured() && (
               <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-3">
                 <button

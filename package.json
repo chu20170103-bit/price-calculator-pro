@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "db:push": "supabase db push",
     "db:link": "supabase link",
+    "supabase:check": "node scripts/check-supabase.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
