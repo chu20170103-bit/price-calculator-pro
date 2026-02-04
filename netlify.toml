@@ -1,0 +1,13 @@
+[build]
+  publish = "dist"
+  command = "bun run build"
+
+# 避免 .js / .mjs 被當成 application/octet-stream 導致模組載入失敗
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+[[headers]]
+  for = "/*.mjs"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
