@@ -104,7 +104,13 @@ export function useSupabaseSync({
   }, [games, currentGameId, namedProfiles]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured() || hasFetched.current) return;
+    if (!isSupabaseConfigured()) {
+      if (typeof window !== 'undefined') {
+        console.warn('[Supabase] 未設定：請在 .env 或 GitHub Secrets 設定 VITE_SUPABASE_URL、VITE_SUPABASE_ANON_KEY');
+      }
+      return;
+    }
+    if (hasFetched.current) return;
     hasFetched.current = true;
     const key = getSyncKey();
     supabase
@@ -113,7 +119,15 @@ export function useSupabaseSync({
       .eq('device_id', key)
       .maybeSingle()
       .then(({ data, error }) => {
-        if (error || !data) return;
+        if (error) {
+          console.error('[Supabase] 讀取失敗:', error.message);
+          toast.error('雲端讀取失敗：' + error.message);
+          return;
+        }
+        if (!data) {
+          if (import.meta.env.DEV) console.info('[Supabase] 此 key 尚無資料，使用本機');
+          return;
+        }
         const gamesFromCloud = data.games as Game[] | null;
         let profilesFromCloud = data.named_profiles;
         if (typeof profilesFromCloud === 'string') {
@@ -129,6 +143,8 @@ export function useSupabaseSync({
           loadGames(gamesFromCloud, cid || gamesFromCloud[0]?.id || '');
         }
         loadProfiles(normalizedProfiles);
+        const total = (normalizedProfiles?.length ?? 0) + (Array.isArray(gamesFromCloud) ? gamesFromCloud.length : 0);
+        if (total > 0) toast.success('已從雲端載入');
       });
   }, [loadGames, loadProfiles]);
 
