@@ -26,6 +26,15 @@ jobs:
           npm ci
           npm install @rollup/rollup-linux-x64-gnu --no-save
 
+      # 若仍裝到 @swc/core 會導致 Linux 上 native binding 失敗，請改用 @vitejs/plugin-react 並提交 package-lock.json
+      - name: Ensure no @swc/core (use plugin-react)
+        run: |
+          if npm ls @swc/core 2>/dev/null | grep -q @swc/core; then
+            echo "::error::@swc/core 仍被安裝，CI 會失敗。請改用 @vitejs/plugin-react 並 push package.json + package-lock.json"
+            exit 1
+          fi
+          echo "OK: 未使用 @swc/core"
+
       # 專案站點網址為 https://<使用者>.github.io/<倉庫名>/
       # 在 Repo Settings → Secrets 新增 VITE_SUPABASE_URL、VITE_SUPABASE_ANON_KEY 後，GitHub Pages 版才能寫入/讀取 Supabase
       - name: Build
