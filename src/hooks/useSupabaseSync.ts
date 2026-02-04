@@ -16,25 +16,22 @@ function getSyncKey(): string {
   return (code && code.trim()) ? code.trim() : DEFAULT_SYNC_KEY;
 }
 
-/** 正規化從 Supabase 讀出的 named_profiles，確保為陣列且每筆含 id, name, rows, createdAt */
-function normalizeProfiles(raw: unknown): NamedPresetProfile[] {
-  if (Array.isArray(raw)) {
-    return raw.map((p: Record<string, unknown>) => ({
-      id: typeof p.id === 'string' ? p.id : 'p_' + Math.random().toString(36).slice(2, 11),
-      name: typeof p.name === 'string' ? p.name : '',
-      rows: Array.isArray(p.rows)
-        ? p.rows.map((r: Record<string, unknown>) => ({
-            minutes: Number(r.minutes) || 0,
-            people: Number(r.people) || 0,
-            cost: Number(r.cost) || 0,
-            fee: Number(r.fee) || 0,
-            profit: Number(r.profit) || 0,
-          }))
-        : [],
-      createdAt: typeof p.createdAt === 'string' ? p.createdAt : new Date().toISOString(),
-    })).filter(p => p.name || p.rows.length > 0);
-  }
-  return [];
+/** 從 pricing_profiles 表多筆 row 轉成 NamedPresetProfile[] */
+function rowsToProfiles(rows: { profile_id: string; name: string; rows: unknown; created_at: string }[]): NamedPresetProfile[] {
+  return rows.map((r) => ({
+    id: r.profile_id,
+    name: r.name || '',
+    rows: Array.isArray(r.rows)
+      ? (r.rows as Record<string, unknown>[]).map((row) => ({
+          minutes: Number(row.minutes) || 0,
+          people: Number(row.people) || 0,
+          cost: Number(row.cost) || 0,
+          fee: Number(row.fee) || 0,
+          profit: Number(row.profit) || 0,
+        }))
+      : [],
+    createdAt: r.created_at || new Date().toISOString(),
+  })).filter((p) => p.name || p.rows.length > 0);
 }
 
 export function isSupabaseConfigured(): boolean {
@@ -60,25 +57,27 @@ export function useSupabaseSync({
 }: UseSupabaseSyncOptions) {
   const hasFetched = useRef(false);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 剛寫入後短時間內不要 refetch，避免把剛刪除的資料又從舊快取讀回來 */
+  const lastSavedAtRef = useRef(0);
   const [syncCode, setSyncCodeState] = useState<string>(() => localStorage.getItem(SYNC_CODE_KEY) || '');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   /** 初次雲端讀取完成後才允許自動儲存，避免用空的本機資料覆蓋雲端 */
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
+  /** 只同步 games + current_game_id 到 pricing_sync（方案紀錄改為單筆存刪） */
   const saveToSupabase = useCallback(async () => {
     if (!isSupabaseConfigured()) {
       console.warn('[Supabase] 未設定，跳過寫入');
       return;
     }
-    console.log('[Supabase] 操作紀錄：開始寫入雲端', { profiles: namedProfiles.length, games: games.length });
+    console.log('[Supabase] 操作紀錄：寫入 games 至雲端');
     setIsSaving(true);
     const key = getSyncKey();
     const payload = {
       device_id: key,
       games,
       current_game_id: currentGameId || null,
-      named_profiles: namedProfiles,
       updated_at: new Date().toISOString(),
     };
 
@@ -99,41 +98,78 @@ export function useSupabaseSync({
       return;
     }
     setLastSyncedAt(new Date());
+    lastSavedAtRef.current = Date.now();
     setIsSaving(false);
     console.log('[Supabase] 操作紀錄：已寫入雲端');
-  }, [games, currentGameId, namedProfiles]);
+  }, [games, currentGameId]);
 
-  /** 從雲端讀取並套用（初次載入 + 切回分頁時立即讀取，快取會由 loadGames/loadProfiles 寫入 localStorage） */
+  /** 單筆新增方案紀錄到雲端 */
+  const addProfileToCloud = useCallback(
+    async (profile: NamedPresetProfile) => {
+      if (!isSupabaseConfigured()) return;
+      const key = getSyncKey();
+      const { error } = await supabase.from('pricing_profiles').insert({
+        device_id: key,
+        profile_id: profile.id,
+        name: profile.name,
+        rows: profile.rows,
+        created_at: profile.createdAt,
+      });
+      if (error) {
+        console.error('[Supabase] 新增方案失敗:', error.message);
+        toast.error('雲端同步失敗：' + error.message);
+        return;
+      }
+      lastSavedAtRef.current = Date.now();
+      console.log('[Supabase] 操作紀錄：已新增單筆方案至雲端');
+    },
+    []
+  );
+
+  /** 單筆刪除方案紀錄（只刪雲端那一筆） */
+  const deleteProfileFromCloud = useCallback(async (profileId: string) => {
+    if (!isSupabaseConfigured()) return;
+    const key = getSyncKey();
+    const { error } = await supabase
+      .from('pricing_profiles')
+      .delete()
+      .eq('device_id', key)
+      .eq('profile_id', profileId);
+    if (error) {
+      console.error('[Supabase] 刪除方案失敗:', error.message);
+      toast.error('雲端刪除失敗：' + error.message);
+      return;
+    }
+    lastSavedAtRef.current = Date.now();
+    console.log('[Supabase] 操作紀錄：已從雲端刪除單筆方案');
+  }, []);
+
+  /** 從雲端讀取並套用（方案紀錄從 pricing_profiles 表一筆一筆讀） */
   const refetchFromCloud = useCallback(() => {
     if (!isSupabaseConfigured()) return;
     console.log('[Supabase] 操作紀錄：從雲端讀取');
     const key = getSyncKey();
-    supabase
-      .from('pricing_sync')
-      .select('games, current_game_id, named_profiles')
-      .eq('device_id', key)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('[Supabase] 讀取失敗:', error.message);
+    Promise.all([
+      supabase.from('pricing_sync').select('games, current_game_id').eq('device_id', key).maybeSingle(),
+      supabase.from('pricing_profiles').select('profile_id, name, rows, created_at').eq('device_id', key).order('created_at', { ascending: false }),
+    ])
+      .then(([syncRes, profilesRes]) => {
+        if (syncRes.error) {
+          console.error('[Supabase] 讀取 pricing_sync 失敗:', syncRes.error.message);
           return;
         }
-        if (!data) return;
-        const gamesFromCloud = data.games as Game[] | null;
-        let profilesFromCloud = data.named_profiles;
-        if (typeof profilesFromCloud === 'string') {
-          try {
-            profilesFromCloud = JSON.parse(profilesFromCloud);
-          } catch {
-            profilesFromCloud = null;
-          }
-        }
-        const normalizedProfiles = normalizeProfiles(profilesFromCloud);
-        const cid = (data.current_game_id as string) || '';
+        const data = syncRes.data;
+        const gamesFromCloud = data?.games as Game[] | null;
+        const cid = (data?.current_game_id as string) || '';
         if (Array.isArray(gamesFromCloud) && gamesFromCloud.length > 0) {
           loadGames(gamesFromCloud, cid || gamesFromCloud[0]?.id || '');
         }
-        loadProfiles(normalizedProfiles);
+        if (profilesRes.error) {
+          console.error('[Supabase] 讀取 pricing_profiles 失敗:', profilesRes.error.message);
+        } else {
+          const list = (profilesRes.data || []) as { profile_id: string; name: string; rows: unknown; created_at: string }[];
+          loadProfiles(rowsToProfiles(list));
+        }
         console.log('[Supabase] 操作紀錄：讀取完成並已套用');
       })
       .catch((err) => console.error('[Supabase] 讀取例外:', err));
@@ -153,41 +189,34 @@ export function useSupabaseSync({
     hasFetched.current = true;
     const key = getSyncKey();
     console.log('[Supabase] 讀取中 key=', key);
-    supabase
-      .from('pricing_sync')
-      .select('games, current_game_id, named_profiles')
-      .eq('device_id', key)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('[Supabase] 讀取失敗:', error.message, error);
-          toast.error('雲端讀取失敗：' + error.message);
+    Promise.all([
+      supabase.from('pricing_sync').select('games, current_game_id').eq('device_id', key).maybeSingle(),
+      supabase.from('pricing_profiles').select('profile_id, name, rows, created_at').eq('device_id', key).order('created_at', { ascending: false }),
+    ])
+      .then(([syncRes, profilesRes]) => {
+        if (syncRes.error) {
+          console.error('[Supabase] 讀取失敗:', syncRes.error.message, syncRes.error);
+          toast.error('雲端讀取失敗：' + syncRes.error.message);
           setInitialLoadDone(true);
           return;
         }
-        if (!data) {
-          console.log('[Supabase] 讀取完成：此 key 尚無資料，使用本機');
-          setInitialLoadDone(true);
-          return;
-        }
-        const gamesFromCloud = data.games as Game[] | null;
-        let profilesFromCloud = data.named_profiles;
-        if (typeof profilesFromCloud === 'string') {
-          try {
-            profilesFromCloud = JSON.parse(profilesFromCloud);
-          } catch {
-            profilesFromCloud = null;
-          }
-        }
-        const normalizedProfiles = normalizeProfiles(profilesFromCloud);
-        const cid = (data.current_game_id as string) || '';
+        const data = syncRes.data;
+        const gamesFromCloud = data?.games as Game[] | null;
+        const cid = (data?.current_game_id as string) || '';
         const gamesCount = Array.isArray(gamesFromCloud) ? gamesFromCloud.length : 0;
-        console.log('[Supabase] 讀取完成：方案紀錄', normalizedProfiles.length, '筆，games', gamesCount, '筆');
+        let profiles: NamedPresetProfile[] = [];
+        if (!profilesRes.error) {
+          const list = (profilesRes.data || []) as { profile_id: string; name: string; rows: unknown; created_at: string }[];
+          profiles = rowsToProfiles(list);
+        } else {
+          console.warn('[Supabase] 讀取 pricing_profiles 失敗:', profilesRes.error.message);
+        }
+        console.log('[Supabase] 讀取完成：方案紀錄', profiles.length, '筆，games', gamesCount, '筆');
         if (Array.isArray(gamesFromCloud) && gamesFromCloud.length > 0) {
           loadGames(gamesFromCloud, cid || gamesFromCloud[0]?.id || '');
         }
-        loadProfiles(normalizedProfiles);
-        const total = (normalizedProfiles?.length ?? 0) + gamesCount;
+        loadProfiles(profiles);
+        const total = profiles.length + gamesCount;
         if (total > 0) toast.success('已從雲端載入');
         setInitialLoadDone(true);
       })
@@ -198,12 +227,17 @@ export function useSupabaseSync({
       });
   }, [loadGames, loadProfiles]);
 
-  /** 切回分頁時立即從雲端讀取，讓其他裝置的變更馬上顯示（快取會更新） */
+  /** 切回分頁時從雲端讀取；若剛寫入完 3 秒內則略過，避免刪除後被舊資料蓋回 */
+  const REFETCH_COOLDOWN_MS = 3000;
   useEffect(() => {
     if (!isSupabaseConfigured() || !initialLoadDone) return;
     let t: ReturnType<typeof setTimeout>;
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastSavedAtRef.current < REFETCH_COOLDOWN_MS) {
+        console.log('[操作紀錄] 剛寫入不久，略過本次從雲端讀取');
+        return;
+      }
       console.log('[操作紀錄] 切回分頁，即將從雲端讀取');
       t = setTimeout(() => refetchFromCloud(), 400);
     };
@@ -240,36 +274,29 @@ export function useSupabaseSync({
         toast.error('請輸入同步碼');
         return;
       }
-      const { data, error } = await supabase
-        .from('pricing_sync')
-        .select('games, current_game_id, named_profiles')
-        .eq('device_id', trimmed)
-        .maybeSingle();
-      if (error) {
-        toast.error(`載入失敗：${error.message}`);
+      const [syncRes, profilesRes] = await Promise.all([
+        supabase.from('pricing_sync').select('games, current_game_id').eq('device_id', trimmed).maybeSingle(),
+        supabase.from('pricing_profiles').select('profile_id, name, rows, created_at').eq('device_id', trimmed).order('created_at', { ascending: false }),
+      ]);
+      if (syncRes.error) {
+        toast.error(`載入失敗：${syncRes.error.message}`);
         return;
       }
-      if (!data) {
+      const data = syncRes.data;
+      if (!data && (!profilesRes.data || profilesRes.data.length === 0)) {
         toast.info('此同步碼尚無資料，之後在此裝置的儲存會寫入此同步碼');
       } else {
-        const gamesFromCloud = data.games as Game[] | null;
-        let profilesFromCloud = data.named_profiles;
-        if (typeof profilesFromCloud === 'string') {
-          try {
-            profilesFromCloud = JSON.parse(profilesFromCloud);
-          } catch {
-            profilesFromCloud = null;
-          }
-        }
-        const normalizedProfiles = normalizeProfiles(profilesFromCloud);
-        const cid = (data.current_game_id as string) || '';
+        const gamesFromCloud = data?.games as Game[] | null;
+        const cid = (data?.current_game_id as string) || '';
         if (Array.isArray(gamesFromCloud) && gamesFromCloud.length > 0) {
           loadGames(gamesFromCloud, cid || gamesFromCloud[0]?.id || '');
         }
-        loadProfiles(normalizedProfiles);
+        const list = (profilesRes.data || []) as { profile_id: string; name: string; rows: unknown; created_at: string }[];
+        const loadedProfiles = rowsToProfiles(list);
+        loadProfiles(loadedProfiles);
         toast.success(
-          normalizedProfiles.length > 0
-            ? `已載入此同步碼的資料（${normalizedProfiles.length} 筆方案）`
+          loadedProfiles.length > 0
+            ? `已載入此同步碼的資料（${loadedProfiles.length} 筆方案）`
             : '已載入此同步碼的資料'
         );
       }
@@ -287,20 +314,24 @@ export function useSupabaseSync({
     saveToSupabase();
   }, [saveToSupabase]);
 
-  /** 刪除雲端儲存：把此 device_id 在 pricing_sync 的那一筆整筆刪除（清空雲端資料） */
+  /** 刪除雲端儲存：此裝置的 pricing_sync 一筆 + pricing_profiles 全部刪除（僅在用戶主動按「清空雲端」時使用） */
   const deleteCloudStorage = useCallback(async () => {
     if (!isSupabaseConfigured()) {
       toast.error('未設定 Supabase');
       return;
     }
     const key = getSyncKey();
-    const { error } = await supabase.from('pricing_sync').delete().eq('device_id', key);
-    if (error) {
-      console.error('[Supabase] 刪除雲端儲存失敗:', error.message);
-      toast.error('刪除雲端儲存失敗：' + error.message);
+    const [syncErr, profilesErr] = await Promise.all([
+      supabase.from('pricing_sync').delete().eq('device_id', key).then((r) => r.error),
+      supabase.from('pricing_profiles').delete().eq('device_id', key).then((r) => r.error),
+    ]);
+    if (syncErr || profilesErr) {
+      const msg = syncErr?.message || profilesErr?.message || '未知錯誤';
+      console.error('[Supabase] 刪除雲端儲存失敗:', msg);
+      toast.error('刪除雲端儲存失敗：' + msg);
       return;
     }
-    console.log('[Supabase] 操作紀錄：已刪除雲端儲存');
+    console.log('[Supabase] 操作紀錄：已刪除雲端儲存（pricing_sync + pricing_profiles）');
     toast.success('已刪除雲端儲存，本機資料不受影響');
   }, []);
 
@@ -315,6 +346,9 @@ export function useSupabaseSync({
     saveNow,
     refetchFromCloud,
     deleteCloudStorage,
+    /** 單筆新增／刪除方案到雲端（每一筆各自儲存與刪除） */
+    addProfileToCloud,
+    deleteProfileFromCloud,
     lastSyncedAt,
     isSaving,
     /** 目前用來讀取／寫入雲端的 key（同步碼或預設 main） */
@@ -333,7 +367,7 @@ export function useSupabaseSync({
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
-  }, [games, currentGameId, namedProfiles, saveToSupabase, initialLoadDone]);
+  }, [games, currentGameId, saveToSupabase, initialLoadDone]);
 
   // 離開分頁／關閉前盡量寫入一次（僅在初次載入完成後，避免覆蓋雲端）
   useEffect(() => {

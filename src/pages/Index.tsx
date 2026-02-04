@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { NamedPresetProfile } from '@/hooks/useNamedPresets';
-import { Calculator } from 'lucide-react';
+import { Calculator, CloudOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { PresetManager } from '@/components/PresetManager';
 import { HistoryList } from '@/components/HistoryList';
@@ -55,7 +55,7 @@ const Index = () => {
   const [livePresets, setLivePresets] = useState<PresetForFormula[]>([]);
   const [pendingImport, setPendingImport] = useState<NamedPresetProfile | null>(null);
 
-  const { saveNow } = useSupabaseSync({
+  const { saveNow, deleteCloudStorage, addProfileToCloud, deleteProfileFromCloud } = useSupabaseSync({
     games,
     currentGameId,
     namedProfiles: profiles,
@@ -63,14 +63,19 @@ const Index = () => {
     loadProfiles: loadProfilesFromCloud,
   });
 
-  /** 刪除方案紀錄後立即寫入雲端 */
+  const handleClearCloud = useCallback(() => {
+    if (window.confirm('確定要刪除雲端上的這份儲存嗎？本機資料不會被刪除。')) {
+      deleteCloudStorage();
+    }
+  }, [deleteCloudStorage]);
+
+  /** 刪除單一方案紀錄：只刪本機 + 雲端該筆，不影響其他方案 */
   const handleDeleteProfile = useCallback(
     (id: string) => {
-      console.log('[操作紀錄] 刪除方案紀錄，即將寫入雲端');
       deleteProfile(id);
-      setTimeout(() => saveNow(), 100);
+      deleteProfileFromCloud(id);
     },
-    [deleteProfile, saveNow]
+    [deleteProfile, deleteProfileFromCloud]
   );
 
   const handlePresetSelect = useCallback(
@@ -146,11 +151,20 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Calculator className="w-8 h-8 text-accent" />
             <h1 className="text-xl font-bold">PRICElady</h1>
           </div>
+          <button
+            type="button"
+            onClick={handleClearCloud}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive transition-colors"
+            title="刪除 Supabase 雲端上的這份儲存（本機不受影響）"
+          >
+            <CloudOff className="w-4 h-4" />
+            清空雲端儲存
+          </button>
         </div>
       </header>
 
@@ -177,10 +191,12 @@ const Index = () => {
                   })));
                 }}
                 onSaveNamed={(name, rows) => {
-                  console.log('[操作紀錄] 新增方案紀錄', name, '，即將寫入雲端');
-                  addProfile(name, rows);
+                  const newProfile = addProfile(name, rows);
+                  if (newProfile) {
+                    addProfileToCloud(newProfile);
+                  }
                   rows.forEach(row => addHistoryEntry(rowToHistoryEntry(name, row)));
-                  setTimeout(() => saveNow(), 100);
+                  saveNow();
                 }}
                 onRowsChange={setLivePresets}
                 pendingImport={pendingImport?.rows ?? null}
