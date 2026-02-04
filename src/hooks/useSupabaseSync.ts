@@ -4,23 +4,36 @@ import { supabase } from '@/lib/supabase';
 import type { Game } from '@/types/pricing';
 import type { NamedPresetProfile } from './useNamedPresets';
 
-const DEVICE_ID_KEY = 'pricing-device-id';
 const SYNC_CODE_KEY = 'pricing-sync-code';
+/** 未設定同步碼時使用的預設 key，讓開頁就讀／寫雲端同一筆資料 */
+const DEFAULT_SYNC_KEY = 'main';
 const SAVE_DEBOUNCE_MS = 800;
 
-function getDeviceId(): string {
-  let id = localStorage.getItem(DEVICE_ID_KEY);
-  if (!id) {
-    id = 'dev_' + Math.random().toString(36).slice(2, 14);
-    localStorage.setItem(DEVICE_ID_KEY, id);
-  }
-  return id;
-}
-
-/** 同步用的 key：有設定同步碼則用同步碼，否則用裝置 ID（同一同步碼 = 跨瀏覽器看到相同資料） */
+/** 同步用的 key：有設定同步碼則用同步碼，否則用預設 main（預設即讀寫雲端） */
 function getSyncKey(): string {
   const code = localStorage.getItem(SYNC_CODE_KEY);
-  return (code && code.trim()) ? code.trim() : getDeviceId();
+  return (code && code.trim()) ? code.trim() : DEFAULT_SYNC_KEY;
+}
+
+/** 正規化從 Supabase 讀出的 named_profiles，確保為陣列且每筆含 id, name, rows, createdAt */
+function normalizeProfiles(raw: unknown): NamedPresetProfile[] {
+  if (Array.isArray(raw)) {
+    return raw.map((p: Record<string, unknown>) => ({
+      id: typeof p.id === 'string' ? p.id : 'p_' + Math.random().toString(36).slice(2, 11),
+      name: typeof p.name === 'string' ? p.name : '',
+      rows: Array.isArray(p.rows)
+        ? p.rows.map((r: Record<string, unknown>) => ({
+            minutes: Number(r.minutes) || 0,
+            people: Number(r.people) || 0,
+            cost: Number(r.cost) || 0,
+            fee: Number(r.fee) || 0,
+            profit: Number(r.profit) || 0,
+          }))
+        : [],
+      createdAt: typeof p.createdAt === 'string' ? p.createdAt : new Date().toISOString(),
+    })).filter(p => p.name || p.rows.length > 0);
+  }
+  return [];
 }
 
 export function isSupabaseConfigured(): boolean {
@@ -102,14 +115,20 @@ export function useSupabaseSync({
       .then(({ data, error }) => {
         if (error || !data) return;
         const gamesFromCloud = data.games as Game[] | null;
-        const profilesFromCloud = data.named_profiles as NamedPresetProfile[] | null;
+        let profilesFromCloud = data.named_profiles;
+        if (typeof profilesFromCloud === 'string') {
+          try {
+            profilesFromCloud = JSON.parse(profilesFromCloud);
+          } catch {
+            profilesFromCloud = null;
+          }
+        }
+        const normalizedProfiles = normalizeProfiles(profilesFromCloud);
         const cid = (data.current_game_id as string) || '';
         if (Array.isArray(gamesFromCloud) && gamesFromCloud.length > 0) {
           loadGames(gamesFromCloud, cid || gamesFromCloud[0]?.id || '');
         }
-        if (Array.isArray(profilesFromCloud)) {
-          loadProfiles(profilesFromCloud);
-        }
+        loadProfiles(normalizedProfiles);
       });
   }, [loadGames, loadProfiles]);
 
@@ -152,15 +171,25 @@ export function useSupabaseSync({
         toast.info('此同步碼尚無資料，之後在此裝置的儲存會寫入此同步碼');
       } else {
         const gamesFromCloud = data.games as Game[] | null;
-        const profilesFromCloud = data.named_profiles as NamedPresetProfile[] | null;
+        let profilesFromCloud = data.named_profiles;
+        if (typeof profilesFromCloud === 'string') {
+          try {
+            profilesFromCloud = JSON.parse(profilesFromCloud);
+          } catch {
+            profilesFromCloud = null;
+          }
+        }
+        const normalizedProfiles = normalizeProfiles(profilesFromCloud);
         const cid = (data.current_game_id as string) || '';
         if (Array.isArray(gamesFromCloud) && gamesFromCloud.length > 0) {
           loadGames(gamesFromCloud, cid || gamesFromCloud[0]?.id || '');
         }
-        if (Array.isArray(profilesFromCloud)) {
-          loadProfiles(profilesFromCloud);
-        }
-        toast.success('已載入此同步碼的資料');
+        loadProfiles(normalizedProfiles);
+        toast.success(
+          normalizedProfiles.length > 0
+            ? `已載入此同步碼的資料（${normalizedProfiles.length} 筆方案）`
+            : '已載入此同步碼的資料'
+        );
       }
       localStorage.setItem(SYNC_CODE_KEY, trimmed);
       setSyncCodeState(trimmed);
@@ -176,7 +205,21 @@ export function useSupabaseSync({
     saveToSupabase();
   }, [saveToSupabase]);
 
-  return { syncCode, setSyncCode, clearSyncCode, loadBySyncCode, saveNow, lastSyncedAt, isSaving };
+  const syncKeyForDisplay = getSyncKey();
+  const isUsingSyncCode = Boolean(syncCode);
+
+  return {
+    syncCode,
+    setSyncCode,
+    clearSyncCode,
+    loadBySyncCode,
+    saveNow,
+    lastSyncedAt,
+    isSaving,
+    /** 目前用來讀取／寫入雲端的 key（同步碼或預設 main） */
+    syncKeyForDisplay: isUsingSyncCode ? syncCode : `${DEFAULT_SYNC_KEY}（預設）`,
+    isUsingSyncCode,
+  };
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
