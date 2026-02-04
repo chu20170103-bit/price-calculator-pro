@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:gh": "bash scripts/build-gh-pages.sh",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",

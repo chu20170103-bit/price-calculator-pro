@@ -60,27 +60,39 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## GitHub Pages 部署（網頁要能開）
+## GitHub Pages 部署（靜態網頁，直接就能用）
 
-**這個專案推送到 [chu20170103-bit/price-calculator-pro](https://github.com/chu20170103-bit/price-calculator-pro) 後，網址為：**  
-**https://chu20170103-bit.github.io/price-calculator-pro/**
+**網址：** **https://chu20170103-bit.github.io/price-calculator-pro/**
 
-### 上傳步驟
+不用 Netlify、不用 Actions，建好靜態檔推到 GitHub 即可。
 
-1. **推送程式碼到 GitHub**
-   ```bash
-   git add .
-   git commit -m "Deploy to GitHub Pages"
-   git push origin main
-   ```
-   若你的遠端分支叫 `master`，就改成 `git push origin master`。
+### 1. 建置靜態檔到 docs/
 
-2. **在 GitHub 開啟 Pages（只需做一次）**  
-   打開 [Settings → Pages](https://github.com/chu20170103-bit/price-calculator-pro/settings/pages) → **Build and deployment** 的 **Source** 選 **GitHub Actions**（不要選 Deploy from a branch）。
+```bash
+npm run build:gh
+```
 
-3. **等 Actions 跑完**  
-   到 [Actions](https://github.com/chu20170103-bit/price-calculator-pro/actions) 看「Deploy to GitHub Pages」變綠色後，開：  
-   **https://chu20170103-bit.github.io/price-calculator-pro/**
+會把建置結果放到 **docs/** 資料夾（已含正確路徑給 GitHub Pages）。
+
+### 2. 推送到 GitHub
+
+```bash
+git add docs
+git commit -m "Update GitHub Pages"
+git push origin main
+```
+
+### 3. 在 GitHub 開啟 Pages（只需做一次）
+
+1. 打開 [Settings → Pages](https://github.com/chu20170103-bit/price-calculator-pro/settings/pages)
+2. **Source** 選 **Deploy from a branch**
+3. **Branch** 選 **main**，資料夾選 **/docs**，按 Save
+
+幾分鐘後開：**https://chu20170103-bit.github.io/price-calculator-pro/**
+
+---
+
+之後要更新網站：改完程式 → `npm run build:gh` → `git add docs` → `git commit` → `git push`。
 
 ## 疑難排解：MIME type "application/octet-stream" 錯誤
 
