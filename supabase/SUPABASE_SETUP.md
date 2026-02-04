@@ -4,7 +4,25 @@
 
 ## 1. 建立資料表
 
-1. 打開 [Supabase Dashboard](https://supabase.com/dashboard/project/wlcknwjkixxphamklvog) → **SQL Editor**。
+### 方式 A：用 CLI（推薦，本機一條指令建立）
+
+在專案根目錄執行：
+
+```bash
+npm install
+npx supabase link --project-ref 你的專案REF
+npx supabase db push
+```
+
+- **專案 REF**：在 Supabase Dashboard 網址裡，例如 `https://supabase.com/dashboard/project/wlcknwjkixxphamklvog` 的 **wlcknwjkixxphamklvog** 就是 project ref。
+- `supabase link` 會問你資料庫密碼（建立專案時設定的），輸入後即連結。
+- `db push` 會把 `supabase/migrations/` 裡的 SQL 套用到遠端資料庫，建立 `pricing_sync` 表。
+
+也可用 npm script：`npm run db:link`、`npm run db:push`（需先 `npx supabase link` 一次）。
+
+### 方式 B：手動在 Dashboard 執行 SQL
+
+1. 打開 [Supabase Dashboard](https://supabase.com/dashboard) → 選你的專案 → **SQL Editor**。
 2. 新增查詢，貼上專案裡 **`supabase/schema.sql`** 的內容，按 **Run** 執行。
 
 ## 2. 取得 API 金鑰

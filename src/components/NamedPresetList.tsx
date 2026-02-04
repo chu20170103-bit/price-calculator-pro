@@ -54,7 +54,7 @@ export function NamedPresetList({ profiles, onDelete, onImport }: NamedPresetLis
         <User className="w-4 h-4" />
         方案紀錄（依姓名）
       </h3>
-      <div className="space-y-1 max-h-[240px] overflow-y-auto">
+      <div className="space-y-1">
         {profiles.map(p => (
           <div
             key={p.id}

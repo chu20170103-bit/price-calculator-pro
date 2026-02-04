@@ -6,7 +6,7 @@ import type { NamedPresetProfile } from './useNamedPresets';
 
 const DEVICE_ID_KEY = 'pricing-device-id';
 const SYNC_CODE_KEY = 'pricing-sync-code';
-const SAVE_DEBOUNCE_MS = 2000;
+const SAVE_DEBOUNCE_MS = 800;
 
 function getDeviceId(): string {
   let id = localStorage.getItem(DEVICE_ID_KEY);

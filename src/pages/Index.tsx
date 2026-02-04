@@ -55,7 +55,7 @@ const Index = () => {
   const [livePresets, setLivePresets] = useState<PresetForFormula[]>([]);
   const [pendingImport, setPendingImport] = useState<NamedPresetProfile | null>(null);
 
-  const { syncCode, setSyncCode, clearSyncCode, loadBySyncCode, saveNow, lastSyncedAt, isSaving } = useSupabaseSync({
+  const { syncCode, setSyncCode, clearSyncCode, loadBySyncCode, lastSyncedAt } = useSupabaseSync({
     games,
     currentGameId,
     namedProfiles: profiles,
@@ -222,23 +222,13 @@ const Index = () => {
                 {showSyncSection && (
                   <div className="space-y-3 pt-1 text-sm">
                     <p className="text-muted-foreground">
-                      新增／刪除／修改方案與歷史都會自動寫入 Supabase，約 2 秒後同步。
+                      新增／刪除／修改會自動同步至雲端（約 1 秒內），不需手動按鈕。
                     </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={saveNow}
-                        disabled={isSaving}
-                        className="rounded border border-input bg-background px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
-                      >
-                        {isSaving ? '同步中…' : '立即同步'}
-                      </button>
-                      {lastSyncedAt && (
-                        <span className="text-muted-foreground">
-                          上次同步 {lastSyncedAt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      )}
-                    </div>
+                    {lastSyncedAt && (
+                      <p className="text-muted-foreground text-xs">
+                        上次同步 {lastSyncedAt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </p>
+                    )}
                     {syncCode ? (
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-muted-foreground">目前同步碼：</span>
