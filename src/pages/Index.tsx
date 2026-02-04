@@ -9,22 +9,59 @@ import { QuickPresetBuilder, PresetForFormula } from '@/components/QuickPresetBu
 import { NamedPresetList } from '@/components/NamedPresetList';
 import { useGameStore } from '@/hooks/useGameStore';
 import { useNamedPresets } from '@/hooks/useNamedPresets';
+import { useSupabaseSync } from '@/hooks/useSupabaseSync';
+import { copyToClipboard } from '@/lib/utils';
 import { Preset, PriceEntry } from '@/types/pricing';
+
+// 將方案紀錄的一筆 row 轉成歷史紀錄用的欄位（不含 id, createdAt）
+function rowToHistoryEntry(
+  gameName: string,
+  row: { minutes: number; people: number; cost: number; fee: number; profit: number }
+) {
+  const price = row.cost + row.fee + row.profit;
+  const profitRate = price > 0 ? (row.profit / price) * 100 : 0;
+  const profitPerMin = row.minutes > 0 ? row.profit / row.minutes : 0;
+  const pricePerPerson = row.people > 0 ? price / row.people : 0;
+  return {
+    gameName,
+    minutes: row.minutes,
+    people: row.people,
+    cost: row.cost,
+    fee: row.fee,
+    price,
+    profit: row.profit,
+    profitRate,
+    profitPerMin,
+    pricePerPerson,
+  };
+}
 
 const Index = () => {
   const {
+    games,
     currentGame,
+    currentGameId,
     addPreset,
     deletePreset,
     importPresets,
     replacePresets,
+    addHistoryEntry,
     deleteHistoryEntry,
     clearHistory,
     importHistory,
+    loadFromCloud: loadGamesFromCloud,
   } = useGameStore();
-  const { profiles, addProfile, deleteProfile } = useNamedPresets();
+  const { profiles, addProfile, deleteProfile, importProfiles, loadFromCloud: loadProfilesFromCloud } = useNamedPresets();
   const [livePresets, setLivePresets] = useState<PresetForFormula[]>([]);
   const [pendingImport, setPendingImport] = useState<NamedPresetProfile | null>(null);
+
+  useSupabaseSync({
+    games,
+    currentGameId,
+    namedProfiles: profiles,
+    loadGames: loadGamesFromCloud,
+    loadProfiles: loadProfilesFromCloud,
+  });
 
   const handlePresetSelect = useCallback(
     (preset: Preset) => {
@@ -48,22 +85,38 @@ const Index = () => {
     toast.success('已套用紀錄');
   }, []);
 
-  const handleExportHistory = useCallback(() => {
+  const handleExportHistory = useCallback(async () => {
     if (!currentGame) return;
-    navigator.clipboard.writeText(JSON.stringify(currentGame.history, null, 2));
-    toast.success('歷史紀錄 JSON 已複製');
-  }, [currentGame]);
+    const payload = { history: currentGame.history, namedProfiles: profiles };
+    const ok = await copyToClipboard(JSON.stringify(payload, null, 2));
+    if (ok) toast.success('歷史紀錄＋方案紀錄 JSON 已複製');
+    else toast.error('無法複製，請手動複製');
+  }, [currentGame, profiles]);
 
-  const handleImportHistory = useCallback((json: string) => {
-    const parsed = JSON.parse(json);
-    const entries = Array.isArray(parsed) ? parsed : [parsed];
-    importHistory(entries);
-  }, [importHistory]);
+  const handleImportHistory = useCallback(
+    (json: string) => {
+      const parsed = JSON.parse(json);
+      if (Array.isArray(parsed)) {
+        importHistory(parsed);
+        toast.success('歷史紀錄已匯入');
+        return;
+      }
+      if (parsed.history && Array.isArray(parsed.history)) {
+        importHistory(parsed.history);
+      }
+      if (parsed.namedProfiles && Array.isArray(parsed.namedProfiles)) {
+        importProfiles(parsed.namedProfiles);
+      }
+      toast.success('歷史紀錄與方案紀錄已匯入');
+    },
+    [importHistory, importProfiles]
+  );
 
-  const handleExportPresets = useCallback(() => {
+  const handleExportPresets = useCallback(async () => {
     if (!currentGame) return;
-    navigator.clipboard.writeText(JSON.stringify(currentGame.presets, null, 2));
-    toast.success('預設方案 JSON 已複製');
+    const ok = await copyToClipboard(JSON.stringify(currentGame.presets, null, 2));
+    if (ok) toast.success('預設方案 JSON 已複製');
+    else toast.error('無法複製，請手動複製');
   }, [currentGame]);
 
   const handleImportNamedProfile = useCallback((profile: NamedPresetProfile) => {
@@ -113,7 +166,10 @@ const Index = () => {
                     price: p.price,
                   })));
                 }}
-                onSaveNamed={(name, rows) => addProfile(name, rows)}
+                onSaveNamed={(name, rows) => {
+                  addProfile(name, rows);
+                  rows.forEach(row => addHistoryEntry(rowToHistoryEntry(name, row)));
+                }}
                 onRowsChange={setLivePresets}
                 pendingImport={pendingImport?.rows ?? null}
                 onImportComplete={handleImportComplete}

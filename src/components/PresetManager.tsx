@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Trash2, Copy, ArrowRight, Download, Upload, Layers } from 'lucide-react';
 import { Preset } from '@/types/pricing';
+import { copyToClipboard } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface PresetManagerProps {
@@ -43,9 +44,10 @@ export function PresetManager({
     }
   };
 
-  const handleCopyJson = (preset: Preset) => {
-    navigator.clipboard.writeText(JSON.stringify(preset, null, 2));
-    toast.success('JSON 已複製');
+  const handleCopyJson = async (preset: Preset) => {
+    const ok = await copyToClipboard(JSON.stringify(preset, null, 2));
+    if (ok) toast.success('JSON 已複製');
+    else toast.error('無法複製');
   };
 
   const handleImport = () => {

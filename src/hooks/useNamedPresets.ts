@@ -45,5 +45,16 @@ export function useNamedPresets() {
     setProfiles(prev => prev.filter(p => p.id !== id));
   }, [setProfiles]);
 
-  return { profiles, addProfile, deleteProfile };
+  const importProfiles = useCallback((newProfiles: NamedPresetProfile[]) => {
+    setProfiles(prev => [...newProfiles.map(p => ({ ...p, id: p.id || generateId() })), ...prev]);
+  }, [setProfiles]);
+
+  const loadFromCloud = useCallback(
+    (newProfiles: NamedPresetProfile[]) => {
+      if (newProfiles.length >= 0) setProfiles(newProfiles.map(p => ({ ...p, id: p.id || generateId() })));
+    },
+    [setProfiles]
+  );
+
+  return { profiles, addProfile, deleteProfile, importProfiles, loadFromCloud };
 }

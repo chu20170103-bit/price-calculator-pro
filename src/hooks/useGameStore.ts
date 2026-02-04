@@ -138,6 +138,14 @@ export function useGameStore() {
     return baseline?.profitPerMin ?? null;
   }, [currentGame]);
 
+  const loadFromCloud = useCallback(
+    (games: Game[], currentGameIdFromCloud: string) => {
+      if (games.length > 0) setGames(games);
+      if (currentGameIdFromCloud) setCurrentGameId(currentGameIdFromCloud);
+    },
+    [setGames, setCurrentGameId]
+  );
+
   return {
     games,
     currentGame,
@@ -155,5 +163,6 @@ export function useGameStore() {
     clearHistory,
     importHistory,
     getBaselinePerMin,
+    loadFromCloud,
   };
 }

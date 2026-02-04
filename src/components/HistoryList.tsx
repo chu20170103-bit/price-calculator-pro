@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, Trash2, Copy, ArrowRight, Download, Upload, Eraser } from 'lucide-react';
 import { PriceEntry } from '@/types/pricing';
+import { copyToClipboard } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface HistoryListProps {
@@ -57,9 +58,10 @@ export function HistoryList({
     }
   };
 
-  const handleCopyJson = (entry: PriceEntry) => {
-    navigator.clipboard.writeText(JSON.stringify(entry, null, 2));
-    toast.success('JSON 已複製');
+  const handleCopyJson = async (entry: PriceEntry) => {
+    const ok = await copyToClipboard(JSON.stringify(entry, null, 2));
+    if (ok) toast.success('JSON 已複製');
+    else toast.error('無法複製');
   };
 
   const handleImport = () => {

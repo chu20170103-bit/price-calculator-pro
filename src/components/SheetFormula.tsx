@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Copy, FileSpreadsheet, ChevronDown, ChevronUp } from 'lucide-react';
+import { copyToClipboard } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface PresetForFormula {
@@ -61,9 +62,10 @@ export function SheetFormula({ presets }: SheetFormulaProps) {
     return formula;
   };
 
-  const handleCopy = (formula: string, name: string) => {
-    navigator.clipboard.writeText(formula);
-    toast.success(`${name}公式已複製`);
+  const handleCopy = async (formula: string, name: string) => {
+    const ok = await copyToClipboard(formula);
+    if (ok) toast.success(`${name}公式已複製`);
+    else toast.error('無法複製');
   };
 
   const costFormula = generateFormula();

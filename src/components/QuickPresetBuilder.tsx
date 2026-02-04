@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Copy, Trash2, Plus, Save, Zap } from 'lucide-react';
+import { copyToClipboard } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface PresetRow {
@@ -161,9 +162,10 @@ export function QuickPresetBuilder({ onApplyPresets, onSaveNamed, onRowsChange, 
     }
   };
 
-  const handleCopyDefaultPresets = () => {
-    navigator.clipboard.writeText(DEFAULT_PRESET_INPUT);
-    toast.success('已複製預設方案格式');
+  const handleCopyDefaultPresets = async () => {
+    const ok = await copyToClipboard(DEFAULT_PRESET_INPUT);
+    if (ok) toast.success('已複製預設方案格式');
+    else toast.error('無法複製');
   };
 
   const handleUseDefaultPresets = () => {
@@ -179,9 +181,10 @@ export function QuickPresetBuilder({ onApplyPresets, onSaveNamed, onRowsChange, 
     }
   };
 
-  const handleCopyOutput = () => {
-    navigator.clipboard.writeText(formattedOutput);
-    toast.success('報價格式已複製');
+  const handleCopyOutput = async () => {
+    const ok = await copyToClipboard(formattedOutput);
+    if (ok) toast.success('報價格式已複製');
+    else toast.error('無法複製');
   };
 
   const handleApplyToPresets = () => {

@@ -60,10 +60,17 @@ export function NamedPresetList({ profiles, onDelete, onImport }: NamedPresetLis
             key={p.id}
             className="rounded-lg border border-border overflow-hidden"
           >
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => setSelectedId(prev => (prev === p.id ? null : p.id))}
-              className={`flex items-center gap-2 w-full px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedId(prev => (prev === p.id ? null : p.id));
+                }
+              }}
+              className={`flex items-center gap-2 w-full px-3 py-2.5 text-left text-sm font-medium transition-colors cursor-pointer ${
                 selectedId === p.id
                   ? 'bg-accent/15 text-accent border-accent/30'
                   : 'bg-card hover:bg-muted/50'
@@ -89,7 +96,7 @@ export function NamedPresetList({ profiles, onDelete, onImport }: NamedPresetLis
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
-            </button>
+            </div>
             {selectedId === p.id && (
               <div className="border-t border-border bg-muted/20 p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
