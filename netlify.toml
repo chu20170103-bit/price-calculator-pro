@@ -1,8 +1,14 @@
 [build]
   publish = "dist"
-  command = "bun run build"
+  command = "npm run build"
 
-# 避免 .js / .mjs 被當成 application/octet-stream 導致模組載入失敗
+# SPA：所有路徑都回傳 index.html，由前端路由處理
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# 避免 .js 被當成 application/octet-stream 導致模組載入失敗
 [[headers]]
   for = "/*.js"
   [headers.values]
