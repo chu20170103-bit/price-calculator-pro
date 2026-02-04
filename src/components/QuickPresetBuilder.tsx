@@ -47,10 +47,10 @@ const formatPrice = (price: number): string => {
 export function QuickPresetBuilder({ onApplyPresets }: QuickPresetBuilderProps) {
   const [rows, setRows] = useState<PresetRow[]>([
     { id: generateId(), minutes: 30, people: 1, cost: 900, fee: 100, profit: 700 },
-    { id: generateId(), minutes: 40, people: 1, cost: 1000, fee: 200, profit: 600 },
-    { id: generateId(), minutes: 60, people: 1, cost: 1300, fee: 200, profit: 800 },
-    { id: generateId(), minutes: 60, people: 2, cost: 1700, fee: 200, profit: 900 },
-    { id: generateId(), minutes: 90, people: 2, cost: 2200, fee: 300, profit: 800 },
+    { id: generateId(), minutes: 40, people: 1, cost: 1000, fee: 200, profit: 700 },
+    { id: generateId(), minutes: 60, people: 1, cost: 1300, fee: 200, profit: 900 },
+    { id: generateId(), minutes: 60, people: 2, cost: 1700, fee: 200, profit: 1000 },
+    { id: generateId(), minutes: 90, people: 2, cost: 2200, fee: 300, profit: 1400 },
   ]);
   const [bulkInput, setBulkInput] = useState('');
 
