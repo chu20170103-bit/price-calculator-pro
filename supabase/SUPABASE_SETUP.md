@@ -73,6 +73,18 @@ npm run dev
 
 若沒在託管平台設定這兩個變數，線上版就不會連 Supabase，也不會寫入。
 
+## 刪除 Supabase 裡的資料
+
+- **在 app 裡**：點右上角 **「清空雲端儲存」**，會刪除目前這台裝置對應的雲端那一筆（本機資料不會被刪）。
+- **在 Supabase 後台**：
+  1. 打開 [Supabase Dashboard](https://supabase.com/dashboard) → 你的專案 → **Table Editor**。
+  2. 選 **pricing_sync**，找到要刪的那一列（例如 `device_id` 為 `main`），點該列左側選取 → 上方 **Delete**。
+- **用 SQL**：在 **SQL Editor** 執行：
+  ```sql
+  DELETE FROM pricing_sync WHERE device_id = 'main';
+  ```
+  或刪除全部：`DELETE FROM pricing_sync;`
+
 ## 注意
 
 - 目前以 **裝置 ID**（存在瀏覽器 localStorage）區分不同裝置的資料，未登入帳號。

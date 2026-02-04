@@ -11,7 +11,7 @@ try {
   // CI 或無此依賴時略過
 }
 
-// 本機開發 base="/"；GitHub Pages 由 CI 設 BASE_PATH=/倉庫名/
+// 本機開發 base="/"；GitHub Pages 由 deploy 腳本設 BASE_PATH=/倉庫名/
 const base = process.env.BASE_PATH || "/";
 const baseHref = base.endsWith("/") ? base : base + "/";
 

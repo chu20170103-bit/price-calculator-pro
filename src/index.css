@@ -6,7 +6,8 @@
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
+    /* 淺灰底，避免與純白混淆、載入前也不會是瀏覽器白 */
+    --background: 220 18% 96%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -88,9 +89,21 @@
     @apply border-border;
   }
 
+  html {
+    min-height: 100%;
+    background: hsl(var(--background));
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  #root {
+    min-height: 100%;
+    min-height: 100dvh;
   }
 
   /* Large touch-friendly inputs for mobile */
@@ -101,14 +114,41 @@
 }
 
 @layer components {
+  /* 手機版安全區域（瀏海／圓角），避免內容貼齊螢幕邊 */
+  .safe-area-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+  /* 手機版縮小左右留白，讓內容盡量鋪滿畫面 */
+  .safe-area-x {
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+  }
+  @media (min-width: 640px) {
+    .safe-area-x {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+
+  /* 手機版卡片內邊距縮小，讓內容完全展開 */
   .card-elevated {
-    @apply bg-card rounded-xl shadow-lg border border-border/50 p-5 md:p-6;
+    @apply bg-card rounded-xl shadow-lg border border-border/50 p-3 sm:p-5 md:p-6;
   }
 
   .input-field {
     @apply w-full h-12 px-4 rounded-lg border border-input bg-background text-foreground 
            placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring 
            focus:border-transparent transition-all duration-200;
+  }
+
+  /* 隱藏數字輸入框的上下箭頭，改為點擊直接輸入，避免擠壓數字顯示 */
+  .input-field[type="number"]::-webkit-outer-spin-button,
+  .input-field[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .input-field[type="number"] {
+    -moz-appearance: textfield;
   }
 
   .btn-primary {

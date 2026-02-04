@@ -280,91 +280,97 @@ export function QuickPresetBuilder({ onApplyPresets, onSaveNamed, onRowsChange, 
         </div>
       </div>
 
-      {/* Rows Table */}
+      {/* Rows Table - 手機版可橫向捲動，避免欄位被擠壓 */}
       <div className="space-y-2">
         <div className="text-sm font-medium text-muted-foreground">
           方案列表（輸入利潤自動計算售價）
         </div>
-        
-        {/* Header */}
-        <div className="grid grid-cols-12 gap-2 px-2 text-xs text-muted-foreground">
-          <div className="col-span-2">分鐘</div>
-          <div className="col-span-1">人</div>
-          <div className="col-span-2">成本</div>
-          <div className="col-span-2">手續費</div>
-          <div className="col-span-2">利潤</div>
-          <div className="col-span-2">售價</div>
-          <div className="col-span-1"></div>
+
+        <div className="overflow-x-auto -mx-1 px-1 min-w-0">
+          <div className="min-w-[360px] max-w-full">
+            {/* Header - 置中對齊 */}
+            <div className="grid grid-cols-12 gap-2 px-2 py-1 text-xs text-muted-foreground items-center [&>div]:text-center [&>div]:truncate">
+              <div className="col-span-2">分鐘</div>
+              <div className="col-span-1">人</div>
+              <div className="col-span-2">成本</div>
+              <div className="col-span-2">手續費</div>
+              <div className="col-span-2">利潤</div>
+              <div className="col-span-2">售價</div>
+              <div className="col-span-1" aria-hidden />
+            </div>
+
+            <div className="space-y-2">
+              {rows.map((row, index) => {
+                const calculated = calculatedRows[index];
+                return (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-12 gap-2 items-stretch sm:items-center p-2.5 sm:p-2 bg-card rounded-lg border border-border min-w-0"
+                  >
+                    <div className="col-span-2 min-w-0 flex items-center justify-center">
+                      <input
+                        type="number"
+                        value={row.minutes || ''}
+                        onChange={(e) => handleUpdateRow(row.id, 'minutes', parseInt(e.target.value) || 0)}
+                        className="input-field text-sm py-2 px-2 min-w-0 w-full max-w-[3.5rem] text-center"
+                        placeholder="分"
+                      />
+                    </div>
+                    <div className="col-span-1 min-w-0 flex items-center justify-center">
+                      <input
+                        type="number"
+                        value={row.people || ''}
+                        onChange={(e) => handleUpdateRow(row.id, 'people', parseInt(e.target.value) || 0)}
+                        className="input-field text-sm py-2 px-2 min-w-0 w-full max-w-[2.5rem] text-center"
+                        placeholder="人"
+                      />
+                    </div>
+                    <div className="col-span-2 min-w-0 flex items-center justify-center">
+                      <input
+                        type="number"
+                        value={row.cost || ''}
+                        onChange={(e) => handleUpdateRow(row.id, 'cost', parseInt(e.target.value) || 0)}
+                        className="input-field text-sm py-2 px-2 min-w-0 w-full max-w-[4.5rem] text-center"
+                        placeholder="成本"
+                      />
+                    </div>
+                    <div className="col-span-2 min-w-0 flex items-center justify-center">
+                      <input
+                        type="number"
+                        value={row.fee || ''}
+                        onChange={(e) => handleUpdateRow(row.id, 'fee', parseInt(e.target.value) || 0)}
+                        className="input-field text-sm py-2 px-2 min-w-0 w-full max-w-[4.5rem] text-center"
+                        placeholder="費用"
+                      />
+                    </div>
+                    <div className="col-span-2 min-w-0 flex items-center justify-center">
+                      <input
+                        type="number"
+                        value={row.profit || ''}
+                        onChange={(e) => handleUpdateRow(row.id, 'profit', parseInt(e.target.value) || 0)}
+                        className="input-field text-sm py-2 px-2 bg-accent/10 border-accent/30 min-w-0 w-full max-w-[4.5rem] text-center"
+                        placeholder="利潤"
+                      />
+                    </div>
+                    <div className="col-span-2 flex items-center justify-center text-sm font-bold text-accent shrink-0 min-w-0">
+                      <span className="truncate">${calculated.price}</span>
+                    </div>
+                    <div className="col-span-1 flex items-center justify-center shrink-0">
+                      <button
+                        onClick={() => handleDeleteRow(row.id)}
+                        className="p-2 hover:bg-destructive/20 rounded touch-manipulation"
+                        aria-label="刪除"
+                      >
+                        <Trash2 className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          {rows.map((row, index) => {
-            const calculated = calculatedRows[index];
-            return (
-              <div 
-                key={row.id} 
-                className="grid grid-cols-12 gap-2 items-center p-2 bg-card rounded-lg border border-border"
-              >
-                <div className="col-span-2">
-                  <input
-                    type="number"
-                    value={row.minutes || ''}
-                    onChange={(e) => handleUpdateRow(row.id, 'minutes', parseInt(e.target.value) || 0)}
-                    className="input-field text-sm py-2 px-2"
-                    placeholder="分"
-                  />
-                </div>
-                <div className="col-span-1">
-                  <input
-                    type="number"
-                    value={row.people || ''}
-                    onChange={(e) => handleUpdateRow(row.id, 'people', parseInt(e.target.value) || 0)}
-                    className="input-field text-sm py-2 px-2"
-                    placeholder="人"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <input
-                    type="number"
-                    value={row.cost || ''}
-                    onChange={(e) => handleUpdateRow(row.id, 'cost', parseInt(e.target.value) || 0)}
-                    className="input-field text-sm py-2 px-2"
-                    placeholder="成本"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <input
-                    type="number"
-                    value={row.fee || ''}
-                    onChange={(e) => handleUpdateRow(row.id, 'fee', parseInt(e.target.value) || 0)}
-                    className="input-field text-sm py-2 px-2"
-                    placeholder="費用"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <input
-                    type="number"
-                    value={row.profit || ''}
-                    onChange={(e) => handleUpdateRow(row.id, 'profit', parseInt(e.target.value) || 0)}
-                    className="input-field text-sm py-2 px-2 bg-accent/10 border-accent/30"
-                    placeholder="利潤"
-                  />
-                </div>
-                <div className="col-span-2 text-sm font-bold text-accent">
-                  ${calculated.price}
-                </div>
-                <div className="col-span-1">
-                  <button
-                    onClick={() => handleDeleteRow(row.id)}
-                    className="p-2 hover:bg-destructive/20 rounded"
-                  >
-                    <Trash2 className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
         <button onClick={handleAddRow} className="btn-ghost text-sm flex items-center gap-1">
           <Plus className="w-4 h-4" />
           新增方案

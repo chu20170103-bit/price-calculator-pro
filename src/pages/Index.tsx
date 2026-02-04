@@ -148,31 +148,31 @@ const Index = () => {
   }, [importPresets]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Calculator className="w-8 h-8 text-accent" />
-            <h1 className="text-xl font-bold">PRICElady</h1>
+      <header className="sticky top-0 z-30 shrink-0 bg-background/80 backdrop-blur-lg border-b border-border safe-area-top">
+        <div className="max-w-7xl mx-auto px-3 py-3 sm:px-4 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Calculator className="w-7 h-7 sm:w-8 sm:h-8 text-accent" />
+            <h1 className="text-lg sm:text-xl font-bold">PRICElady</h1>
           </div>
           <button
             type="button"
             onClick={handleClearCloud}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive transition-colors"
+            className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground hover:text-destructive transition-colors touch-manipulation"
             title="刪除 Supabase 雲端上的這份儲存（本機不受影響）"
           >
             <CloudOff className="w-4 h-4" />
-            清空雲端儲存
+            <span className="hidden sm:inline">清空雲端儲存</span>
           </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Main Content - 手機版全螢幕可捲動區域 */}
+      <main className="flex-1 min-h-0 overflow-y-auto w-full max-w-7xl mx-auto py-4 sm:py-6 safe-area-x">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Quick Preset Builder Card - Takes 2 columns on desktop */}
-          <section className="card-elevated space-y-5 lg:col-span-2">
+          <section className="card-elevated space-y-4 sm:space-y-5 lg:col-span-2 w-full min-w-0">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-accent" />
               快速方案產生器
@@ -232,7 +232,7 @@ const Index = () => {
           </section>
 
           {/* Right column: Named presets + History */}
-          <section className="card-elevated space-y-5">
+          <section className="card-elevated space-y-4 sm:space-y-5 w-full min-w-0">
             <NamedPresetList profiles={profiles} onDelete={handleDeleteProfile} onImport={handleImportNamedProfile} />
 
             <h2 className="text-lg font-semibold flex items-center gap-2">
