@@ -7,6 +7,8 @@ import { PresetManager } from '@/components/PresetManager';
 import { InputField } from '@/components/InputField';
 import { StatCard } from '@/components/StatCard';
 import { HistoryList } from '@/components/HistoryList';
+import { SheetFormula } from '@/components/SheetFormula';
+import { QuickPresetBuilder } from '@/components/QuickPresetBuilder';
 import { useGameStore } from '@/hooks/useGameStore';
 import { FormData, CalculatedStats, Preset, PriceEntry } from '@/types/pricing';
 
@@ -255,13 +257,30 @@ const Index = () => {
             </div>
 
             {currentGame && (
-              <PresetManager
-                presets={currentGame.presets}
-                onApply={handlePresetSelect}
-                onDelete={deletePreset}
-                onExport={handleExportPresets}
-                onImport={handleImportPresets}
-              />
+              <>
+                <PresetManager
+                  presets={currentGame.presets}
+                  onApply={handlePresetSelect}
+                  onDelete={deletePreset}
+                  onExport={handleExportPresets}
+                  onImport={handleImportPresets}
+                />
+                <SheetFormula presets={currentGame.presets} />
+                <QuickPresetBuilder
+                  onApplyPresets={(presets) => {
+                    presets.forEach(p => {
+                      addPreset({
+                        label: `${p.minutes}分/${p.people}人`,
+                        minutes: p.minutes,
+                        people: p.people,
+                        cost: p.cost,
+                        fee: p.fee,
+                        price: p.price,
+                      });
+                    });
+                  }}
+                />
+              </>
             )}
           </section>
 
