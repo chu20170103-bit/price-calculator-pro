@@ -1,0 +1,6 @@
+# 讓主機用正確 MIME 類型提供 JS，避免「application/octet-stream」錯誤
+# Netlify 會讀取此檔；建置後會在 dist/_headers
+/assets/*.js
+  Content-Type: application/javascript; charset=utf-8
+/assets/*.mjs
+  Content-Type: application/javascript; charset=utf-8
