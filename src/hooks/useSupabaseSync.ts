@@ -62,6 +62,8 @@ export function useSupabaseSync({
   const [syncCode, setSyncCodeState] = useState<string>(() => localStorage.getItem(SYNC_CODE_KEY) || '');
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  /** 初次雲端讀取完成後才允許自動儲存，避免用空的本機資料覆蓋雲端 */
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const saveToSupabase = useCallback(async () => {
     if (!isSupabaseConfigured()) {
@@ -104,15 +106,19 @@ export function useSupabaseSync({
   }, [games, currentGameId, namedProfiles]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
+    const configured = isSupabaseConfigured();
+    console.log('[Supabase] 初次載入檢查:', configured ? '已設定，準備讀取' : '未設定（請設 VITE_SUPABASE_URL、VITE_SUPABASE_ANON_KEY）');
+    if (!configured) {
       if (typeof window !== 'undefined') {
         console.warn('[Supabase] 未設定：請在 .env 或 GitHub Secrets 設定 VITE_SUPABASE_URL、VITE_SUPABASE_ANON_KEY');
       }
+      setInitialLoadDone(true);
       return;
     }
     if (hasFetched.current) return;
     hasFetched.current = true;
     const key = getSyncKey();
+    console.log('[Supabase] 讀取中 key=', key);
     supabase
       .from('pricing_sync')
       .select('games, current_game_id, named_profiles')
@@ -120,12 +126,14 @@ export function useSupabaseSync({
       .maybeSingle()
       .then(({ data, error }) => {
         if (error) {
-          console.error('[Supabase] 讀取失敗:', error.message);
+          console.error('[Supabase] 讀取失敗:', error.message, error);
           toast.error('雲端讀取失敗：' + error.message);
+          setInitialLoadDone(true);
           return;
         }
         if (!data) {
-          if (import.meta.env.DEV) console.info('[Supabase] 此 key 尚無資料，使用本機');
+          console.log('[Supabase] 讀取完成：此 key 尚無資料，使用本機');
+          setInitialLoadDone(true);
           return;
         }
         const gamesFromCloud = data.games as Game[] | null;
@@ -139,12 +147,20 @@ export function useSupabaseSync({
         }
         const normalizedProfiles = normalizeProfiles(profilesFromCloud);
         const cid = (data.current_game_id as string) || '';
+        const gamesCount = Array.isArray(gamesFromCloud) ? gamesFromCloud.length : 0;
+        console.log('[Supabase] 讀取完成：方案紀錄', normalizedProfiles.length, '筆，games', gamesCount, '筆');
         if (Array.isArray(gamesFromCloud) && gamesFromCloud.length > 0) {
           loadGames(gamesFromCloud, cid || gamesFromCloud[0]?.id || '');
         }
         loadProfiles(normalizedProfiles);
-        const total = (normalizedProfiles?.length ?? 0) + (Array.isArray(gamesFromCloud) ? gamesFromCloud.length : 0);
+        const total = (normalizedProfiles?.length ?? 0) + gamesCount;
         if (total > 0) toast.success('已從雲端載入');
+        setInitialLoadDone(true);
+      })
+      .catch((err) => {
+        console.error('[Supabase] 讀取例外:', err);
+        toast.error('雲端讀取失敗');
+        setInitialLoadDone(true);
       });
   }, [loadGames, loadProfiles]);
 
@@ -239,6 +255,7 @@ export function useSupabaseSync({
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
+    if (!initialLoadDone) return;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
       saveTimeout.current = null;
@@ -247,11 +264,11 @@ export function useSupabaseSync({
     return () => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
-  }, [games, currentGameId, namedProfiles, saveToSupabase]);
+  }, [games, currentGameId, namedProfiles, saveToSupabase, initialLoadDone]);
 
-  // 離開分頁／關閉前盡量寫入一次（避免只依賴 debounce）
+  // 離開分頁／關閉前盡量寫入一次（僅在初次載入完成後，避免覆蓋雲端）
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
+    if (!isSupabaseConfigured() || !initialLoadDone) return;
     const flush = () => saveToSupabase();
     const onHide = () => flush();
     window.addEventListener('visibilitychange', onHide);
@@ -260,5 +277,5 @@ export function useSupabaseSync({
       window.removeEventListener('visibilitychange', onHide);
       window.removeEventListener('pagehide', onHide);
     };
-  }, [saveToSupabase]);
+  }, [saveToSupabase, initialLoadDone]);
 }
