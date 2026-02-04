@@ -60,49 +60,39 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## GitHub Pages 部署（網頁要能開）
+## GitHub Pages 部署（靜態網頁，直接就能用）
 
-**完成後網址：** **https://chu20170103-bit.github.io/price-calculator-pro/**
+**網址：** **https://chu20170103-bit.github.io/price-calculator-pro/**
 
-### 第一步：確認有 push 到 GitHub（含 .github）
+不用 Netlify、不用 Actions，建好靜態檔推到 GitHub 即可。
+
+### 1. 建置靜態檔到 docs/
 
 ```bash
-git add .
-git status   # 確認有 .github/workflows/deploy-gh-pages.yml
-git commit -m "Add GitHub Pages deploy"
+npm run build:gh
+```
+
+會把建置結果放到 **docs/** 資料夾（已含正確路徑給 GitHub Pages）。
+
+### 2. 推送到 GitHub
+
+```bash
+git add docs
+git commit -m "Update GitHub Pages"
 git push origin main
 ```
 
-若遠端預設分支是 `master`，就改成 `git push origin master`。**一定要有 `.github/workflows/` 資料夾**，否則不會自動建站。
+### 3. 在 GitHub 開啟 Pages（只需做一次）
 
-### 第二步：在 GitHub 開啟 Pages（只需做一次）
+1. 打開 [Settings → Pages](https://github.com/chu20170103-bit/price-calculator-pro/settings/pages)
+2. **Source** 選 **Deploy from a branch**
+3. **Branch** 選 **main**，資料夾選 **/docs**，按 Save
 
-1. 打開：**[Settings → Pages](https://github.com/chu20170103-bit/price-calculator-pro/settings/pages)**
-2. **Build and deployment** 底下 **Source** 選 **「Deploy from a branch」**
-3. **Branch** 選 **「gh-pages」**，資料夾選 **「/ (root)"**，按 Save
-
-（第一次 push 後，Actions 會自動建出 `gh-pages` 分支，若當下沒有這個選項，先完成第三步再回來選。）
-
-### 第三步：等 Actions 跑完
-
-1. 到 **[Actions](https://github.com/chu20170103-bit/price-calculator-pro/actions)**
-2. 點最新的「Deploy to GitHub Pages」workflow，確認是綠色打勾
-3. 若有紅色失敗，點進去看是哪一步錯（常見：`npm ci` 失敗代表缺 `package-lock.json`，請在本機執行 `npm install` 後把 `package-lock.json` 一併 commit 推送）
-
-### 第四步：開網頁
-
-等 1～2 分鐘後打開：**https://chu20170103-bit.github.io/price-calculator-pro/**
+幾分鐘後開：**https://chu20170103-bit.github.io/price-calculator-pro/**
 
 ---
 
-### 還是看不到時請檢查
-
-| 狀況 | 做法 |
-|------|------|
-| 開網址是 404 | 確認 Settings → Pages 的 Branch 已選 **gh-pages** |
-| Actions 是紅色 | 點進該次 run 看錯誤；缺 lock 檔就執行 `npm install` 並 push `package-lock.json` |
-| 網頁空白或錯版 | 等 2～5 分鐘再重新整理，或再 push 一次觸發重新部署 |
-| 不確定有沒有 .github | 在 GitHub 倉庫看根目錄有沒有 `.github/workflows/deploy-gh-pages.yml`，沒有就從本機再 push 一次 |
+之後要更新網站：改完程式 → `npm run build:gh` → `git add docs` → `git commit` → `git push`。
 
 ## 疑難排解：MIME type "application/octet-stream" 錯誤
 
