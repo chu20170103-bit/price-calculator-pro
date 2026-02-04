@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { NamedPresetProfile } from '@/hooks/useNamedPresets';
-import { Calculator } from 'lucide-react';
+import { Calculator, Cloud, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { PresetManager } from '@/components/PresetManager';
 import { HistoryList } from '@/components/HistoryList';
@@ -9,7 +9,7 @@ import { QuickPresetBuilder, PresetForFormula } from '@/components/QuickPresetBu
 import { NamedPresetList } from '@/components/NamedPresetList';
 import { useGameStore } from '@/hooks/useGameStore';
 import { useNamedPresets } from '@/hooks/useNamedPresets';
-import { useSupabaseSync } from '@/hooks/useSupabaseSync';
+import { useSupabaseSync, isSupabaseConfigured } from '@/hooks/useSupabaseSync';
 import { copyToClipboard } from '@/lib/utils';
 import { Preset, PriceEntry } from '@/types/pricing';
 
@@ -55,13 +55,16 @@ const Index = () => {
   const [livePresets, setLivePresets] = useState<PresetForFormula[]>([]);
   const [pendingImport, setPendingImport] = useState<NamedPresetProfile | null>(null);
 
-  useSupabaseSync({
+  const { syncCode, setSyncCode, clearSyncCode, loadBySyncCode, saveNow, lastSyncedAt, isSaving } = useSupabaseSync({
     games,
     currentGameId,
     namedProfiles: profiles,
     loadGames: loadGamesFromCloud,
     loadProfiles: loadProfilesFromCloud,
   });
+  const [syncCodeInput, setSyncCodeInput] = useState('');
+  const [loadCodeInput, setLoadCodeInput] = useState('');
+  const [showSyncSection, setShowSyncSection] = useState(false);
 
   const handlePresetSelect = useCallback(
     (preset: Preset) => {
@@ -203,8 +206,92 @@ const Index = () => {
             )}
           </section>
 
-          {/* Right column: Named presets + History */}
+          {/* Right column: Named presets + History + Sync */}
           <section className="card-elevated space-y-5">
+            {isSupabaseConfigured() && (
+              <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSyncSection(!showSyncSection)}
+                  className="flex w-full items-center gap-2 text-sm font-medium text-foreground"
+                >
+                  <Cloud className="h-4 w-4 text-muted-foreground" />
+                  跨裝置同步（同步碼）
+                  {showSyncSection ? <ChevronUp className="ml-auto h-4 w-4" /> : <ChevronDown className="ml-auto h-4 w-4" />}
+                </button>
+                {showSyncSection && (
+                  <div className="space-y-3 pt-1 text-sm">
+                    <p className="text-muted-foreground">
+                      新增／刪除／修改方案與歷史都會自動寫入 Supabase，約 2 秒後同步。
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={saveNow}
+                        disabled={isSaving}
+                        className="rounded border border-input bg-background px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
+                      >
+                        {isSaving ? '同步中…' : '立即同步'}
+                      </button>
+                      {lastSyncedAt && (
+                        <span className="text-muted-foreground">
+                          上次同步 {lastSyncedAt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                    {syncCode ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">目前同步碼：</span>
+                        <code className="rounded bg-muted px-2 py-0.5 font-mono">{syncCode}</code>
+                        <button
+                          type="button"
+                          onClick={clearSyncCode}
+                          className="text-muted-foreground underline hover:text-foreground"
+                        >
+                          清除
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={syncCodeInput}
+                          onChange={e => setSyncCodeInput(e.target.value)}
+                          placeholder="輸入同步碼（例：PRICE01）"
+                          className="flex-1 rounded border border-input bg-background px-2 py-1.5 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setSyncCode(syncCodeInput)}
+                          className="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90"
+                        >
+                          設定
+                        </button>
+                      </div>
+                    )}
+                    <div className="border-t border-border/60 pt-2">
+                      <p className="mb-2 text-muted-foreground">在其它瀏覽器／裝置使用：</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={loadCodeInput}
+                          onChange={e => setLoadCodeInput(e.target.value)}
+                          placeholder="輸入同步碼"
+                          className="flex-1 rounded border border-input bg-background px-2 py-1.5 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => loadBySyncCode(loadCodeInput)}
+                          className="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90"
+                        >
+                          載入
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <NamedPresetList profiles={profiles} onDelete={deleteProfile} onImport={handleImportNamedProfile} />
 
             <h2 className="text-lg font-semibold flex items-center gap-2">

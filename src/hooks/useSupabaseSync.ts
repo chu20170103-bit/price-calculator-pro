@@ -1,10 +1,11 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import type { Game } from '@/types/pricing';
 import type { NamedPresetProfile } from './useNamedPresets';
 
 const DEVICE_ID_KEY = 'pricing-device-id';
+const SYNC_CODE_KEY = 'pricing-sync-code';
 const SAVE_DEBOUNCE_MS = 2000;
 
 function getDeviceId(): string {
@@ -14,6 +15,12 @@ function getDeviceId(): string {
     localStorage.setItem(DEVICE_ID_KEY, id);
   }
   return id;
+}
+
+/** 同步用的 key：有設定同步碼則用同步碼，否則用裝置 ID（同一同步碼 = 跨瀏覽器看到相同資料） */
+function getSyncKey(): string {
+  const code = localStorage.getItem(SYNC_CODE_KEY);
+  return (code && code.trim()) ? code.trim() : getDeviceId();
 }
 
 export function isSupabaseConfigured(): boolean {
@@ -39,14 +46,21 @@ export function useSupabaseSync({
 }: UseSupabaseSyncOptions) {
   const hasFetched = useRef(false);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [syncCode, setSyncCodeState] = useState<string>(() => localStorage.getItem(SYNC_CODE_KEY) || '');
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const saveToSupabase = useCallback(async () => {
     if (!isSupabaseConfigured()) {
+      if (import.meta.env.DEV) {
+        console.info('[Supabase] 未設定：請在 .env 設定 VITE_SUPABASE_URL、VITE_SUPABASE_ANON_KEY');
+      }
       return;
     }
-    const deviceId = getDeviceId();
+    setIsSaving(true);
+    const key = getSyncKey();
     const payload = {
-      device_id: deviceId,
+      device_id: key,
       games,
       current_game_id: currentGameId || null,
       named_profiles: namedProfiles,
@@ -56,27 +70,34 @@ export function useSupabaseSync({
     const { data: existing } = await supabase
       .from('pricing_sync')
       .select('id')
-      .eq('device_id', deviceId)
+      .eq('device_id', key)
       .maybeSingle();
 
     const { error } = existing
-      ? await supabase.from('pricing_sync').update(payload).eq('device_id', deviceId)
+      ? await supabase.from('pricing_sync').update(payload).eq('device_id', key)
       : await supabase.from('pricing_sync').insert(payload);
 
     if (error) {
-      console.warn('[Supabase] save failed:', error);
+      console.error('[Supabase] 寫入失敗:', error.message, error);
       toast.error(`雲端同步失敗：${error.message}`);
+      setIsSaving(false);
+      return;
+    }
+    setLastSyncedAt(new Date());
+    setIsSaving(false);
+    if (import.meta.env.DEV) {
+      console.info('[Supabase] 已寫入');
     }
   }, [games, currentGameId, namedProfiles]);
 
   useEffect(() => {
     if (!isSupabaseConfigured() || hasFetched.current) return;
     hasFetched.current = true;
-    const deviceId = getDeviceId();
+    const key = getSyncKey();
     supabase
       .from('pricing_sync')
       .select('games, current_game_id, named_profiles')
-      .eq('device_id', deviceId)
+      .eq('device_id', key)
       .maybeSingle()
       .then(({ data, error }) => {
         if (error || !data) return;
@@ -92,6 +113,71 @@ export function useSupabaseSync({
       });
   }, [loadGames, loadProfiles]);
 
+  const setSyncCode = useCallback((code: string) => {
+    const trimmed = code.trim();
+    if (trimmed) {
+      localStorage.setItem(SYNC_CODE_KEY, trimmed);
+      setSyncCodeState(trimmed);
+      toast.success('已設定同步碼，此裝置的資料會與其他輸入相同同步碼的裝置共用');
+    }
+  }, []);
+
+  const clearSyncCode = useCallback(() => {
+    localStorage.removeItem(SYNC_CODE_KEY);
+    setSyncCodeState('');
+    toast.success('已清除同步碼，此裝置改回使用本機識別');
+  }, []);
+
+  const loadBySyncCode = useCallback(
+    async (code: string) => {
+      if (!isSupabaseConfigured()) {
+        toast.error('尚未設定 Supabase，無法載入');
+        return;
+      }
+      const trimmed = code.trim();
+      if (!trimmed) {
+        toast.error('請輸入同步碼');
+        return;
+      }
+      const { data, error } = await supabase
+        .from('pricing_sync')
+        .select('games, current_game_id, named_profiles')
+        .eq('device_id', trimmed)
+        .maybeSingle();
+      if (error) {
+        toast.error(`載入失敗：${error.message}`);
+        return;
+      }
+      if (!data) {
+        toast.info('此同步碼尚無資料，之後在此裝置的儲存會寫入此同步碼');
+      } else {
+        const gamesFromCloud = data.games as Game[] | null;
+        const profilesFromCloud = data.named_profiles as NamedPresetProfile[] | null;
+        const cid = (data.current_game_id as string) || '';
+        if (Array.isArray(gamesFromCloud) && gamesFromCloud.length > 0) {
+          loadGames(gamesFromCloud, cid || gamesFromCloud[0]?.id || '');
+        }
+        if (Array.isArray(profilesFromCloud)) {
+          loadProfiles(profilesFromCloud);
+        }
+        toast.success('已載入此同步碼的資料');
+      }
+      localStorage.setItem(SYNC_CODE_KEY, trimmed);
+      setSyncCodeState(trimmed);
+    },
+    [loadGames, loadProfiles]
+  );
+
+  const saveNow = useCallback(() => {
+    if (saveTimeout.current) {
+      clearTimeout(saveTimeout.current);
+      saveTimeout.current = null;
+    }
+    saveToSupabase();
+  }, [saveToSupabase]);
+
+  return { syncCode, setSyncCode, clearSyncCode, loadBySyncCode, saveNow, lastSyncedAt, isSaving };
+
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
@@ -103,4 +189,17 @@ export function useSupabaseSync({
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
   }, [games, currentGameId, namedProfiles, saveToSupabase]);
+
+  // 離開分頁／關閉前盡量寫入一次（避免只依賴 debounce）
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const flush = () => saveToSupabase();
+    const onHide = () => flush();
+    window.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      window.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onHide);
+    };
+  }, [saveToSupabase]);
 }
