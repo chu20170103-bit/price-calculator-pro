@@ -1,7 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+let componentTagger: (() => unknown) | null = null;
+try {
+  componentTagger = require("lovable-tagger").componentTagger;
+} catch {
+  // CI 或無此依賴時略過
+}
 
 // 本機開發 base="/"；GitHub Pages 由 CI 設 BASE_PATH=/倉庫名/
 const base = process.env.BASE_PATH || "/";
@@ -12,7 +20,7 @@ export default defineConfig(({ mode }) => ({
   server: { host: "::", port: 8080, hmr: { overlay: false } },
   plugins: [
     react(),
-    mode === "development" && componentTagger(),
+    mode === "development" && componentTagger,
     {
       name: "inject-base",
       transformIndexHtml(html) {

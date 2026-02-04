@@ -11,6 +11,8 @@
     "db:push": "supabase db push",
     "db:link": "supabase link",
     "supabase:check": "node scripts/check-supabase.mjs",
+    "deploy:gh": "node scripts/deploy-gh-pages.mjs",
+    "deploy:gh:wait": "node scripts/deploy-gh-pages.mjs --wait",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
